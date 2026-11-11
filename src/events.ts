@@ -34,6 +34,8 @@ type Results = {
     pivot: Pivot;
     'polygonSelection.removeLastPoint': boolean;
     'publish.userStatus': Promise<UserStatus | null>;
+    'recorder.recording': boolean;
+    'recorder.samples': readonly number[];
     'render.baseFilename': string;
     'render.image': Promise<boolean>;
     'render.maxTextureSize': number;
