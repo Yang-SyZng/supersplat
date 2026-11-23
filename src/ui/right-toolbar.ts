@@ -1,5 +1,7 @@
 import { Button, Container, Element } from '@playcanvas/pcui';
 
+import type { CameraControlMode } from '../camera';
+import { CAMERA_CONTROL_MODES } from '../camera';
 import type { Events } from '../events';
 import type { ShortcutManager } from '../shortcut-manager';
 
@@ -8,6 +10,7 @@ import appearanceSvg from './svg/appearance.svg';
 import cameraFrameSelectionSvg from './svg/camera-frame-selection.svg';
 import cameraResetSvg from './svg/camera-reset.svg';
 import flyCameraSvg from './svg/fly-camera.svg';
+import freeCameraSvg from './svg/free-camera.svg';
 import orbitCameraSvg from './svg/orbit-camera.svg';
 import overlaysSvg from './svg/overlays.svg';
 import type { Tooltips } from './tooltips';
@@ -35,16 +38,6 @@ class RightToolbar extends Container {
             class: 'right-toolbar-toggle'
         });
 
-        const orbitMode = new Button({
-            id: 'right-toolbar-orbit-mode',
-            class: ['right-toolbar-toggle', 'active']
-        });
-
-        const flyMode = new Button({
-            id: 'right-toolbar-fly-mode',
-            class: 'right-toolbar-toggle'
-        });
-
         const cameraFrameSelection = new Button({
             id: 'right-toolbar-frame-selection',
             class: 'right-toolbar-button'
@@ -66,38 +59,6 @@ class RightToolbar extends Container {
             icon: 'E283'
         });
 
-        appearance.dom.appendChild(createSvg(appearanceSvg));
-        orbitMode.dom.appendChild(createSvg(orbitCameraSvg));
-        flyMode.dom.appendChild(createSvg(flyCameraSvg));
-        cameraFrameSelection.dom.appendChild(createSvg(cameraFrameSelectionSvg));
-        cameraReset.dom.appendChild(createSvg(cameraResetSvg));
-        overlays.dom.appendChild(createSvg(overlaysSvg));
-
-        // icon-only buttons: keep accessible names in sync with the language
-        const buttonLabels: [Button, string][] = [
-            [appearance, 'panel.appearance'],
-            [overlays, 'panel.overlays'],
-            [orbitMode, 'tooltip.right-toolbar.orbit-camera'],
-            [flyMode, 'tooltip.right-toolbar.fly-camera'],
-            [cameraFrameSelection, 'tooltip.right-toolbar.frame-selection'],
-            [cameraReset, 'tooltip.right-toolbar.reset-camera'],
-            [settings, 'panel.settings']
-        ];
-        buttonLabels.forEach(([button, key]) => {
-            i18n.onChange(() => button.dom.setAttribute('aria-label', i18n.t(key)), button);
-        });
-
-        this.append(appearance);
-        this.append(overlays);
-        this.append(new Element({ class: 'right-toolbar-separator' }));
-        this.append(orbitMode);
-        this.append(flyMode);
-        this.append(new Element({ class: 'right-toolbar-separator' }));
-        this.append(cameraFrameSelection);
-        this.append(cameraReset);
-        this.append(new Element({ class: 'right-toolbar-separator' }));
-        this.append(settings);
-
         // Helper to compose localized tooltip text with shortcut
         const shortcutManager: ShortcutManager = events.invoke('shortcutManager');
         const tooltip = (localeKey: string, shortcutId?: string) => () => {
@@ -111,9 +72,54 @@ class RightToolbar extends Container {
             return text;
         };
 
+        // camera mode buttons are data-driven: a new mode only needs an entry
+        // here and the camera implementation
+        const modeInfo: Record<CameraControlMode, { icon: string; labelKey: string }> = {
+            orbit: { icon: orbitCameraSvg, labelKey: 'tooltip.right-toolbar.orbit-camera' },
+            fly: { icon: flyCameraSvg, labelKey: 'tooltip.right-toolbar.fly-camera' },
+            free: { icon: freeCameraSvg, labelKey: 'tooltip.right-toolbar.free-camera' }
+        };
+        const modeButtons = CAMERA_CONTROL_MODES.map((mode) => {
+            const button = new Button({
+                id: `right-toolbar-${mode}-mode`,
+                class: mode === 'orbit' ? ['right-toolbar-toggle', 'active'] : 'right-toolbar-toggle'
+            });
+            button.dom.appendChild(createSvg(modeInfo[mode].icon));
+            i18n.onChange(() => button.dom.setAttribute('aria-label', i18n.t(modeInfo[mode].labelKey)), button);
+            return { mode, button };
+        });
+
+        appearance.dom.appendChild(createSvg(appearanceSvg));
+        cameraFrameSelection.dom.appendChild(createSvg(cameraFrameSelectionSvg));
+        cameraReset.dom.appendChild(createSvg(cameraResetSvg));
+        overlays.dom.appendChild(createSvg(overlaysSvg));
+
+        // icon-only buttons: keep accessible names in sync with the language
+        const buttonLabels: [Button, string][] = [
+            [appearance, 'panel.appearance'],
+            [overlays, 'panel.overlays'],
+            [cameraFrameSelection, 'tooltip.right-toolbar.frame-selection'],
+            [cameraReset, 'tooltip.right-toolbar.reset-camera'],
+            [settings, 'panel.settings']
+        ];
+        buttonLabels.forEach(([button, key]) => {
+            i18n.onChange(() => button.dom.setAttribute('aria-label', i18n.t(key)), button);
+        });
+
+        this.append(appearance);
+        this.append(overlays);
+        this.append(new Element({ class: 'right-toolbar-separator' }));
+        modeButtons.forEach(({ button }) => this.append(button));
+        this.append(new Element({ class: 'right-toolbar-separator' }));
+        this.append(cameraFrameSelection);
+        this.append(cameraReset);
+        this.append(new Element({ class: 'right-toolbar-separator' }));
+        this.append(settings);
+
         tooltips.register(appearance, tooltip('panel.appearance'), 'left');
-        tooltips.register(orbitMode, tooltip('tooltip.right-toolbar.orbit-camera', 'camera.toggleControlMode'), 'left');
-        tooltips.register(flyMode, tooltip('tooltip.right-toolbar.fly-camera', 'camera.toggleControlMode'), 'left');
+        modeButtons.forEach(({ mode, button }) => {
+            tooltips.register(button, tooltip(modeInfo[mode].labelKey, 'camera.toggleControlMode'), 'left');
+        });
         tooltips.register(
             cameraFrameSelection,
             tooltip('tooltip.right-toolbar.frame-selection', 'camera.focus'),
@@ -126,8 +132,9 @@ class RightToolbar extends Container {
         // add event handlers
 
         appearance.on('click', () => events.fire('appearancePanel.toggleVisible'));
-        orbitMode.on('click', () => events.fire('camera.setControlMode', 'orbit'));
-        flyMode.on('click', () => events.fire('camera.setControlMode', 'fly'));
+        modeButtons.forEach(({ mode, button }) => {
+            button.on('click', () => events.fire('camera.setControlMode', mode));
+        });
         cameraFrameSelection.on('click', () => events.fire('camera.focus'));
         cameraReset.on('click', () => events.fire('camera.reset'));
         overlays.on('click', () => events.fire('overlaysPanel.toggleVisible'));
@@ -137,9 +144,10 @@ class RightToolbar extends Container {
             appearance.class[visible ? 'add' : 'remove']('active');
         });
 
-        events.on('camera.controlMode', (mode: 'orbit' | 'fly') => {
-            orbitMode.class[mode === 'orbit' ? 'add' : 'remove']('active');
-            flyMode.class[mode === 'fly' ? 'add' : 'remove']('active');
+        events.on('camera.controlMode', (mode: CameraControlMode) => {
+            modeButtons.forEach(({ mode: buttonMode, button }) => {
+                button.class[buttonMode === mode ? 'add' : 'remove']('active');
+            });
         });
 
         events.on('overlaysPanel.visible', (visible: boolean) => {

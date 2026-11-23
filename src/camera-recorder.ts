@@ -59,7 +59,8 @@ const registerCameraRecorderEvents = (events: Events) => {
             frame,
             position: new Vec3(pose.position.x, pose.position.y, pose.position.z),
             target: new Vec3(pose.target.x, pose.target.y, pose.target.z),
-            fov: pose.fov
+            fov: pose.fov,
+            roll: pose.roll
         });
         lastSampledFrame = frame;
         events.fire('recorder.sampled', frame);

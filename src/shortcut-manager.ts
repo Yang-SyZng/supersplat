@@ -8,82 +8,133 @@ import { Shortcuts } from './shortcuts';
 const isMac = platform.name === 'osx';
 
 // Default shortcut bindings - the source of truth for key mappings
-const defaultShortcuts: Record<string, ShortcutBinding> = {
-    // Navigation
-    'camera.reset': { keys: ['f'], shift: 'required' },
-    'camera.focus': { keys: ['f'] },
-    'camera.toggleControlMode': { keys: ['v'] },
+const defaultShortcuts = (events: Events): Record<string, ShortcutBinding> => {
+    // free-mode-only keys are gated so the same physical keys keep their
+    // usual tool meanings in the other camera modes
+    const freeCamera = () =>
+        events.functions.has('camera.controlMode') && events.invoke('camera.controlMode') === 'free';
 
-    // Show
-    'grid.toggleVisible': { keys: ['g'] },
-    'camera.toggleShowInfo': { keys: ['i'] },
-    'select.hide': { keys: ['h'] },
-    'select.unhide': { keys: ['h'], shift: 'required' },
+    return {
+        // Navigation
+        'camera.reset': { keys: ['f'], shift: 'required' },
+        'camera.focus': { keys: ['f'] },
+        'camera.toggleControlMode': { keys: ['v'] },
 
-    // Playback
-    'timeline.togglePlay': { keys: [' '] },
-    'timeline.prevFrame': { keys: [','], repeat: true },
-    'timeline.nextFrame': { keys: ['.'], repeat: true },
-    'timeline.prevKey': { keys: ['<'], shift: 'optional', repeat: true },
-    'timeline.nextKey': { keys: ['>'], shift: 'optional', repeat: true },
-    'track.addKey': { keys: ['Enter'] },
-    'track.removeKey': { keys: ['Enter'], shift: 'required' },
+        // Free camera look. Declared before the show/tool bindings so
+        // I/J/K/L/O are claimed while the free camera is active; in the other
+        // modes their enabled gate fails and they fall through to their
+        // usual actions.
+        'camera.free.lookUp': {
+            codes: ['KeyI'],
+            held: true,
+            shift: 'optional',
+            alt: 'optional',
+            enabled: freeCamera
+        },
+        'camera.free.lookDown': {
+            codes: ['KeyK'],
+            held: true,
+            shift: 'optional',
+            alt: 'optional',
+            enabled: freeCamera
+        },
+        'camera.free.yawLeft': {
+            codes: ['KeyJ'],
+            held: true,
+            shift: 'optional',
+            alt: 'optional',
+            enabled: freeCamera
+        },
+        'camera.free.yawRight': {
+            codes: ['KeyL'],
+            held: true,
+            shift: 'optional',
+            alt: 'optional',
+            enabled: freeCamera
+        },
+        'camera.free.rollCW': {
+            codes: ['KeyO'],
+            held: true,
+            shift: 'optional',
+            alt: 'optional',
+            enabled: freeCamera
+        },
+        'camera.free.rollCCW': {
+            codes: ['KeyU'],
+            held: true,
+            shift: 'optional',
+            alt: 'optional',
+            enabled: freeCamera
+        },
 
-    // Selection
-    'select.all': { keys: ['a'], ctrl: 'required', capture: true },
-    'select.none': { keys: ['a'], ctrl: 'required', shift: 'required', capture: true },
-    'select.invert': { keys: ['i'], ctrl: 'required' },
-    'select.delete': { keys: ['Delete', 'Backspace'] },
-    'selection.toggleUseDepth': { keys: ['n'] },
-    'selection.toggleFootprint': { keys: ['m'] },
-    'view.toggleEditView': { keys: ['Tab'] },
+        // Show
+        'grid.toggleVisible': { keys: ['g'] },
+        'camera.toggleShowInfo': { keys: ['i'] },
+        'select.hide': { keys: ['h'] },
+        'select.unhide': { keys: ['h'], shift: 'required' },
 
-    // Tools
-    // 1/2/3 don't fire tool.move/rotate/scale directly: while a shape
-    // selection tool (box/sphere) is active they switch its gizmo mode
-    // instead of switching tools (see ToolManager)
-    'tool.moveShortcut': { keys: ['1'] },
-    'tool.rotateShortcut': { keys: ['2'] },
-    'tool.scaleShortcut': { keys: ['3'] },
-    'tool.rectSelection': { keys: ['r'] },
-    'tool.lassoSelection': { keys: ['l'] },
-    'tool.polygonSelection': { keys: ['p'] },
-    'tool.brushSelection': { keys: ['b'] },
-    'tool.sphereBrushSelection': { keys: ['b'], shift: 'required' },
-    'tool.floodSelection': { keys: ['o'] },
-    'tool.eyedropperSelection': { keys: ['e'], ctrl: 'required', capture: true },
-    'tool.brushSelection.smaller': { keys: ['['], repeat: true },
-    'tool.brushSelection.bigger': { keys: [']'], repeat: true },
-    'tool.deactivate': { keys: ['Escape'] },
-    'tool.toggleCoordSpace': { keys: ['c'], shift: 'required' },
+        // Playback
+        'timeline.togglePlay': { keys: [' '] },
+        'timeline.prevFrame': { keys: [','], repeat: true },
+        'timeline.nextFrame': { keys: ['.'], repeat: true },
+        'timeline.prevKey': { keys: ['<'], shift: 'optional', repeat: true },
+        'timeline.nextKey': { keys: ['>'], shift: 'optional', repeat: true },
+        'track.addKey': { keys: ['Enter'] },
+        'track.removeKey': { keys: ['Enter'], shift: 'required' },
 
-    // Other
-    'edit.undo': { keys: ['z'], ctrl: 'required', repeat: true, capture: true },
-    'edit.redo': { keys: ['z'], ctrl: 'required', shift: 'required', repeat: true, capture: true },
-    'dataPanel.toggle': { keys: ['d'], ctrl: 'required', capture: true },
-    'timelinePanel.toggle': { keys: ['t'], ctrl: 'required', capture: true },
-    'scene.reexport': { keys: ['e'], ctrl: 'required', shift: 'required', capture: true },
+        // Selection
+        'select.all': { keys: ['a'], ctrl: 'required', capture: true },
+        'select.none': { keys: ['a'], ctrl: 'required', shift: 'required', capture: true },
+        'select.invert': { keys: ['i'], ctrl: 'required' },
+        'select.delete': { keys: ['Delete', 'Backspace'] },
+        'selection.toggleUseDepth': { keys: ['n'] },
+        'selection.toggleFootprint': { keys: ['m'] },
+        'view.toggleEditView': { keys: ['Tab'] },
 
-    // Camera fly keys - use physical positions (codes) for WASD layout on non-QWERTY keyboards
-    'camera.fly.forward': { codes: ['KeyW'], held: true, shift: 'optional', alt: 'optional' },
-    'camera.fly.backward': { codes: ['KeyS'], held: true, shift: 'optional', alt: 'optional' },
-    'camera.fly.left': { codes: ['KeyA'], held: true, shift: 'optional', alt: 'optional' },
-    'camera.fly.right': { codes: ['KeyD'], held: true, shift: 'optional', alt: 'optional' },
-    'camera.fly.down': { codes: ['KeyQ'], held: true, shift: 'optional', alt: 'optional' },
-    'camera.fly.up': { codes: ['KeyE'], held: true, shift: 'optional', alt: 'optional' },
-    'camera.modifier.fast': { codes: ['ShiftLeft', 'ShiftRight'], held: true, alt: 'optional' },
-    'camera.modifier.slow': { codes: ['AltLeft', 'AltRight'], held: true, shift: 'optional' }
+        // Tools
+        // 1/2/3 don't fire tool.move/rotate/scale directly: while a shape
+        // selection tool (box/sphere) is active they switch its gizmo mode
+        // instead of switching tools (see ToolManager)
+        'tool.moveShortcut': { keys: ['1'] },
+        'tool.rotateShortcut': { keys: ['2'] },
+        'tool.scaleShortcut': { keys: ['3'] },
+        'tool.rectSelection': { keys: ['r'] },
+        'tool.lassoSelection': { keys: ['l'] },
+        'tool.polygonSelection': { keys: ['p'] },
+        'tool.brushSelection': { keys: ['b'] },
+        'tool.sphereBrushSelection': { keys: ['b'], shift: 'required' },
+        'tool.floodSelection': { keys: ['o'] },
+        'tool.eyedropperSelection': { keys: ['e'], ctrl: 'required', capture: true },
+        'tool.brushSelection.smaller': { keys: ['['], repeat: true },
+        'tool.brushSelection.bigger': { keys: [']'], repeat: true },
+        'tool.deactivate': { keys: ['Escape'] },
+        'tool.toggleCoordSpace': { keys: ['c'], shift: 'required' },
+
+        // Other
+        'edit.undo': { keys: ['z'], ctrl: 'required', repeat: true, capture: true },
+        'edit.redo': { keys: ['z'], ctrl: 'required', shift: 'required', repeat: true, capture: true },
+        'dataPanel.toggle': { keys: ['d'], ctrl: 'required', capture: true },
+        'timelinePanel.toggle': { keys: ['t'], ctrl: 'required', capture: true },
+        'scene.reexport': { keys: ['e'], ctrl: 'required', shift: 'required', capture: true },
+
+        // Camera movement keys - shared by fly and free modes. Use physical
+        // positions (codes) for the WASD layout on non-QWERTY keyboards.
+        'camera.move.forward': { codes: ['KeyW'], held: true, shift: 'optional', alt: 'optional' },
+        'camera.move.backward': { codes: ['KeyS'], held: true, shift: 'optional', alt: 'optional' },
+        'camera.move.left': { codes: ['KeyA'], held: true, shift: 'optional', alt: 'optional' },
+        'camera.move.right': { codes: ['KeyD'], held: true, shift: 'optional', alt: 'optional' },
+        'camera.move.down': { codes: ['KeyQ'], held: true, shift: 'optional', alt: 'optional' },
+        'camera.move.up': { codes: ['KeyE'], held: true, shift: 'optional', alt: 'optional' },
+        'camera.modifier.fast': { codes: ['ShiftLeft', 'ShiftRight'], held: true, alt: 'optional' },
+        'camera.modifier.slow': { codes: ['AltLeft', 'AltRight'], held: true, shift: 'optional' }
+    };
 };
 
 class ShortcutManager {
     private bindings: Record<string, ShortcutBinding>;
 
     constructor(events: Events) {
-        // Clone the defaults so they can be modified without affecting the originals
-        this.bindings = {};
-        for (const id in defaultShortcuts) {
-            this.bindings[id] = { ...defaultShortcuts[id] };
-        }
+        this.bindings = defaultShortcuts(events);
 
         // Create shortcuts and register all bindings
         const shortcuts = new Shortcuts(events);
@@ -98,7 +149,8 @@ class ShortcutManager {
                 alt: binding.alt,
                 held: binding.held,
                 repeat: binding.repeat,
-                capture: binding.capture
+                capture: binding.capture,
+                enabled: binding.enabled
             });
         }
     }
